@@ -7,16 +7,17 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Data.Entity;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
 
 public static async Task<HttpResponseMessage> Run(HttpRequestMessage req, TraceWriter log)
 {
-    log.Info("C# HTTP trigger function processed a request.");
+    log.Info("Processing new everyday.");
 
     // Get request body.
     PostData data = await req.Content.ReadAsAsync<PostData>();
-    var splitFile = data.name.Split("  ");
-    var splitName = splitFile[1].Split(".");
+    var splitFile = data.name.Split(new string[] { "  " }, StringSplitOptions.None);
+    var splitName = splitFile[1].Split('.');
 
     // Get file information.
     var date = splitFile[0];
@@ -24,30 +25,45 @@ public static async Task<HttpResponseMessage> Run(HttpRequestMessage req, TraceW
     var extension = splitName[1].ToLower();
 
     // Try to parse the date.
-    var everydayDate = DateTime.Parse(date);
+    var everydayDate = DateTime.Parse(date).Date;
+    var everydayMonth = everydayDate.AddDays(-everydayDate.Day + 1).Date;
 
+    log.Info("Parsed data.");
     try
     {
         using (var context = new EverydayContext())
         {
-            var everyday = context.Everydays.Where(x => x.Date.Date == everydayDate.Date).FirstOrDefault();
-            var month = context.Months.Where(x => everydayDate.Month == x.Date.Month && everydayDate.Year == x.Date.Year).First();
-
+            var everyday = context.Everydays.Where(x => x.Date == everydayDate)
+                .Include(x => x.Pieces)
+                .FirstOrDefault();
+            var month = context.Months.Where(x => everydayMonth == x.Start)
+                .Include(x => x.Themes)
+                .First();
             var medium = GetMediumFromExtension(extension);
             var theme = month.Themes.Where(x => x.Medium == medium).First();
 
             if (everyday == null)
             {
+                log.Info("Creating new everyday.");
                 everyday = new Everyday() { Date = everydayDate, Month = month, Pieces = new List<Piece>() };
                 context.Everydays.Add(everyday);
+            }
+            else
+            {
+                log.Info("Updating existing everyday.");
             }
 
             var piece = everyday.Pieces.Where(x => x.Theme == theme).FirstOrDefault();
 
             if (piece == null)
             {
+                log.Info("Creating new piece.");
                 piece = new Piece();
                 everyday.Pieces.Add(piece);
+            }
+            else
+            {
+                log.Info("Updating existing piece.");
             }
 
             piece.Theme = theme;
@@ -119,6 +135,8 @@ public class Everyday
     }
     [Key]
     public int ID { get; set; }
+    public int MonthID { get; set; }
+    [ForeignKey("MonthID")]
     public virtual Month Month { get; set; }
     public DateTime Date { get; set; }
     public ICollection<Piece> Pieces { get; set; }
@@ -145,10 +163,19 @@ public class Piece
 
     [Key]
     public int ID { get; set; }
+    [ForeignKey("ThemeID")]
     public Theme Theme { get; set; }
+    public int ThemeID { get; set; }
     public string Title { get; set; }
     public string URL { get; set; }
+
+    [ForeignKey("SourceID")]
     public Piece Source { get; set; }
+    public int? SourceID { get; set; }
+
+    [ForeignKey("EverydayID")]
+    public Everyday Everyday { get; set; }
+    public int EverydayID { get; set; }
 }
 
 public class Theme
@@ -161,6 +188,9 @@ public class Theme
     public int ID { get; set; }
     public string Title { get; set; }
     public Medium Medium { get; set; }
+    [ForeignKey("MonthID")]
+    public Month Month { get; set; }
+    public int MonthID { get; set; }
 }
 
 public enum Medium
