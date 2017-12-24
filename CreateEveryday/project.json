@@ -1,0 +1,10 @@
+﻿{
+  "frameworks": {
+    "net46": {
+      "dependencies": {
+        "EntityFramework": "6.2.0",
+        "System.Data.Common": "4.3.0"
+      }
+    }
+  }
+}
