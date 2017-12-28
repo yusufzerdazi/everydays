@@ -1,5 +1,6 @@
 #r "System.Configuration"
 #r "System.Data"
+#r "System.Runtime.Serialization"
 
 using System;
 using System.Configuration;
@@ -9,66 +10,63 @@ using System.Data.Entity;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
+using System.Text;
+using System.Data.SqlClient;
+using System.IO;
 
-public static async Task<HttpResponseMessage> Run(HttpRequestMessage req, TraceWriter log)
+private const string VideosUrl = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoZVpLTzNkZXBUWEVKTloyUUE/driveItem/children";
+
+public static async Task Run(TimerInfo myTimer, TraceWriter log)
 {
     log.Info("Processing new everyday.");
 
-    // Get request body.
-    PostData data = await req.Content.ReadAsAsync<PostData>();
-    var splitFile = data.name.Split(new string[] { "  " }, StringSplitOptions.None);
-    var splitName = splitFile[1].Split('.');
+    // Get items from folder.
+    var folderItemsJson = await GetItems();
+    var folderItems = DeserialiseItems(folderItemsJson);
 
-    // Get file information.
-    var date = splitFile[0];
-    var title = splitName[0];
-    var extension = splitName[1].ToLower();
+    // Parse corresponding everydays.
+    var folderEverydays = GetFolderEverydays(folderItems, log);
+    log.Info("Parsed everydays.");
 
-    // Try to parse the date.
-    var everydayDate = DateTime.Parse(date).Date;
-    var everydayMonth = everydayDate.AddDays(-everydayDate.Day + 1).Date;
-
-    log.Info("Parsed data.");
-    try
-    {
+    try {
         using (var context = new EverydayContext())
         {
-            var everyday = context.Everydays.Where(x => x.Date == everydayDate)
-                .Include(x => x.Pieces)
-                .FirstOrDefault();
-            var month = context.Months.Where(x => everydayMonth == x.Start)
-                .Include(x => x.Themes)
-                .First();
-            var medium = GetMediumFromExtension(extension);
-            var theme = month.Themes.Where(x => x.Medium == medium).First();
+            // Convert URLs to content URLs
+            foreach(var folderEveryday in folderEverydays){
+                // Get matching db everyday.
+                var everyday = context.Everydays.Where(x => x.Date == folderEveryday.Date)
+                    .Include(x => x.Pieces.Select(y => y.Theme))
+                    .FirstOrDefault();
+                
+                if(everyday == null){
+                    everyday = new Everyday(){
+                        Date = folderEveryday.Date,
+                        Month = folderEveryday.Month,
+                        MonthID = folderEveryday.MonthID,
+                        Pieces = new List<Piece>()
+                    };
+                    log.Info($"New everyday with date: {everyday.Date}");
+                    log.Info($"Month id is: {everyday.MonthID.ToString()}");
+                    context.Everydays.Add(folderEveryday);
+                }
 
-            if (everyday == null)
-            {
-                log.Info("Creating new everyday.");
-                everyday = new Everyday() { Date = everydayDate, Month = month, Pieces = new List<Piece>() };
-                context.Everydays.Add(everyday);
-            }
-            else
-            {
-                log.Info("Updating existing everyday.");
-            }
+                foreach(var folderPiece in folderEveryday.Pieces){
+                    var piece = everyday.Pieces.Where(p => p.ThemeID == folderPiece.ThemeID).FirstOrDefault();
 
-            var piece = everyday.Pieces.Where(x => x.Theme == theme).FirstOrDefault();
-
-            if (piece == null)
-            {
-                log.Info("Creating new piece.");
-                piece = new Piece();
-                everyday.Pieces.Add(piece);
+                    if(piece == null){
+                        piece = folderPiece;
+                        everyday.Pieces.Add(folderPiece);
+                        log.Info($"New piece with title: {piece.Title}");
+                    }
+                    else {
+                        piece.Title = folderPiece.Title;
+                        piece.URL = folderPiece.URL;
+                        log.Info($"Updating piece with title: {piece.Title}");
+                    }
+                }
             }
-            else
-            {
-                log.Info("Updating existing piece.");
-            }
-
-            piece.Theme = theme;
-            piece.Title = title;
-            piece.URL = GetUrlFromSharingUrl(data.url);
 
             context.SaveChanges();
         }
@@ -77,21 +75,96 @@ public static async Task<HttpResponseMessage> Run(HttpRequestMessage req, TraceW
     {
         log.Info($"There was an error: {ex.Message}.");
     }
+}
 
-    return req.CreateResponse(HttpStatusCode.OK, "Successfully created Everyday with title " + title);
+public static List<Everyday> GetFolderEverydays(List<Item> items, TraceWriter log){
+    var folderEverydays = new List<Everyday>();
+    using(var context = new EverydayContext()){
+        foreach (var item in items){
+            try {
+                // Parse strings
+                var itemData = item.name.Split(new string[] {"  "}, StringSplitOptions.None);
+                var itemDate = itemData[0];
+                var title = Path.GetFileNameWithoutExtension(itemData[1]);
+                var extension = Path.GetExtension(itemData[1]);
+                
+                // Parse dates.
+                var everydayDate = DateTime.Parse(itemDate).Date;
+                var everydayMonth = everydayDate.AddDays(- everydayDate.Day + 1).Date;
+
+                // Find matching month.
+                var month = context.Months.Where(x => everydayMonth == x.Start)
+                    .Include(x => x.Themes)
+                    .FirstOrDefault();     
+                if(month == null){ continue; }
+
+                // Find matching medium.
+                var medium = Medium.Image;
+                try {
+                    medium = GetMediumFromExtension(extension);
+                } catch(Exception) { 
+                    continue; 
+                }
+                
+                // Find matching theme.        
+                var theme = month.Themes.Where(x => x.Medium == medium).FirstOrDefault();
+                if(theme == null) { continue; }
+
+                // Fetch matching everyday.
+                var itemEveryday = folderEverydays.Where(e => e.Date == everydayDate).FirstOrDefault();
+                if (itemEveryday == null){
+                    itemEveryday = new Everyday(){
+                        Date = everydayDate,
+                        MonthID = month.ID,
+                        Pieces = new List<Piece>()
+                    };
+
+                    folderEverydays.Add(itemEveryday);
+                }
+                
+                itemEveryday.Pieces.Add(new Piece(){
+                    ThemeID = theme.ID,
+                    Title = title,
+                    URL = GetUrlFromSharingUrl(item.webUrl)
+                });
+            }
+            catch(IndexOutOfRangeException){
+                log.Info($"File name not formatted correctly: {item.name}");
+            }
+        }
+    }
+    return folderEverydays;
+}
+
+public static async Task<string> GetItems(){
+    using (var client = new HttpClient(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate }))
+    {
+        client.BaseAddress = new Uri(VideosUrl);
+        HttpResponseMessage response = await client.GetAsync("");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+}
+
+public static List<Item> DeserialiseItems(string json){
+    Folder folder = new Folder();  
+    using(MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(json))){
+        DataContractJsonSerializer ser = new DataContractJsonSerializer(folder.GetType());  
+        folder = ser.ReadObject(ms) as Folder;  
+    }
+    return folder.value.ToList();
 }
 
 public static Medium GetMediumFromExtension(string extension)
 {
     switch (extension)
     {
-        case ("mp4"):
-        case ("webm"):
+        case (".mp4"):
             return Medium.Video;
-        case ("png"):
-        case ("jpg"):
+        case (".png"):
+        case (".jpg"):
             return Medium.Image;
-        case ("mp3"):
+        case (".mp3"):
             return Medium.Sound;
         default:
             throw new InvalidOperationException("No matching medium found.");
@@ -106,11 +179,20 @@ public static string GetUrlFromSharingUrl(string sharingUrl)
     return resultUrl;
 }
 
-// Deserialise POST data.
-public class PostData
-{
-    public string name { get; set; }
-    public string url { get; set; }
+[DataContract]  
+internal class Folder  
+{  
+    [DataMember]  
+    internal List<Item> value;  
+}
+
+[DataContract]  
+internal class Item  
+{  
+    [DataMember]  
+    internal string webUrl;
+    [DataMember]  
+    internal string name;
 }
 
 // Context
