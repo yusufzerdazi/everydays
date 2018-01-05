@@ -22,8 +22,8 @@ namespace Yusuf.Zerdazi.Everydays
     public static class CreateEveryday
     {
         private const string VideosUrl = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoZVpLTzNkZXBUWEVKTloyUUE/driveItem/children";
-        private const string AudioURL = "";
-        private const string ImagesURL = "";
+        private const string AudioURL = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoZEVTY091c25XbG16VVJtZHc/driveItem/children";
+        private const string ImagesURL = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoYzliSXozZlJic3c0ZnhsQWc/driveItem/children";
         private const bool ENABLE_UPDATES = false;
 
         [FunctionName("CreateEveryday")]
@@ -32,8 +32,13 @@ namespace Yusuf.Zerdazi.Everydays
             log.Info("Processing new everyday.");
 
             // Get items from folder.
-            var folderItemsJson = await GetItems(VideosUrl);
-            var folderItems = DeserialiseItems(folderItemsJson);
+            var videoFolderItemsJson = await GetItems(VideosUrl);
+            var audioFolderItemsJson = await GetItems(AudioURL);
+            var imagesFolderItemsJson = await GetItems(ImagesURL);
+
+            var folderItems = DeserialiseItems(videoFolderItemsJson);
+            folderItems.AddRange(DeserialiseItems(audioFolderItemsJson));
+            folderItems.AddRange(DeserialiseItems(imagesFolderItemsJson));
 
             // Parse corresponding everydays.
             var folderEverydays = GetFolderEverydays(folderItems, log);
@@ -84,7 +89,7 @@ namespace Yusuf.Zerdazi.Everydays
                         }
                     }
 
-                    // context.SaveChanges();
+                    context.SaveChanges();
                 }
             }
             catch (System.Data.Entity.Infrastructure.DbUpdateException ex)
@@ -156,7 +161,7 @@ namespace Yusuf.Zerdazi.Everydays
                     }
                     catch (IndexOutOfRangeException)
                     {
-                        log.Info($"File name not formatted correctly: {item.name}");
+                        // log.Info($"File name not formatted correctly: {item.name}");
                     }
                 }
             }
