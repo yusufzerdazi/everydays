@@ -27,7 +27,7 @@ namespace Yusuf.Zerdazi.Everydays
         private const bool ENABLE_UPDATES = false;
 
         [FunctionName("CreateEveryday")]
-        public static async Task Run([TimerTrigger("0 */15 * * * *")]TimerInfo myTimer, TraceWriter log)
+        public static async Task Run([TimerTrigger("0 0 0 * * *")]TimerInfo myTimer, TraceWriter log)
         {
             log.Info("Processing new everyday.");
 
