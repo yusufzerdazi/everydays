@@ -4,9 +4,7 @@
       "name": "req",
       "type": "httpTrigger",
       "direction": "in",
-      "authLevel": "function",
-      "route": "create",
-      "methods": ["post"]
+      "authLevel": "function"
     }
   ],
   "disabled": false

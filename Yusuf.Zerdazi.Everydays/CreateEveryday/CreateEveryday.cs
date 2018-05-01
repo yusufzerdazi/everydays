@@ -16,7 +16,6 @@ using System.Text;
 using System.IO;
 using System.Collections.Generic;
 using System.Net.Http;
-using Microsoft.Azure.WebJobs.Extensions.Http;
 
 namespace Yusuf.Zerdazi.Everydays
 {
@@ -28,12 +27,14 @@ namespace Yusuf.Zerdazi.Everydays
         private const bool ENABLE_UPDATES = false;
 
         [FunctionName("CreateEveryday")]
-        public static async Task Run([HttpTrigger(AuthorizationLevel.Function, "post", Route = "create")]HttpRequestMessage req, TraceWriter log)
+        public static async Task Run(HttpRequestMessage req, TraceWriter log)
         {
             log.Info("Processing new everyday.");
 
             // parse query parameter
-            PostData data = await req.Content.ReadAsAsync<PostData>();
+            string name = req.GetQueryNameValuePairs().FirstOrDefault(q => string.Compare(q.Key, "name", true) == 0).Value;
+            string date = req.GetQueryNameValuePairs().FirstOrDefault(q => string.Compare(q.Key, "date", true) == 0).Value;
+            string ext = req.GetQueryNameValuePairs().FirstOrDefault(q => string.Compare(q.Key, "ext", true) == 0).Value;
 
             // Get items from folder.
             var videoFolderItemsJson = await GetItems(VideosUrl);
@@ -45,7 +46,7 @@ namespace Yusuf.Zerdazi.Everydays
             folderItems.AddRange(DeserialiseItems(imagesFolderItemsJson));
 
             // Parse corresponding everydays.
-            var folderEverydays = GetFolderEverydays(folderItems, data, log);
+            var folderEverydays = GetFolderEverydays(folderItems, name, date, ext, log);
             log.Info("Parsed everydays.");
 
             try
@@ -102,7 +103,7 @@ namespace Yusuf.Zerdazi.Everydays
             }
         }
 
-        public static List<Everyday> GetFolderEverydays(List<Item> items, PostData data, TraceWriter log)
+        public static List<Everyday> GetFolderEverydays(List<Item> items, string name, string date, string ext, TraceWriter log)
         {
             var folderEverydays = new List<Everyday>();
             using (var context = new EverydayContext())
@@ -117,9 +118,9 @@ namespace Yusuf.Zerdazi.Everydays
                         var title = Path.GetFileNameWithoutExtension(itemData[1]);
                         var extension = Path.GetExtension(itemData[1]).ToLower();
 
-                        if (title != data.name) continue;
-                        if (itemDate != data.date) continue;
-                        if (extension != data.extension) continue;
+                        if (title != name) continue;
+                        if (itemDate != date) continue;
+                        if (extension != ext) continue;
 
                         // Parse dates.
                         var everydayDate = DateTime.Parse(itemDate).Date;
@@ -321,13 +322,6 @@ namespace Yusuf.Zerdazi.Everydays
         public enum Medium
         {
             Image, Sound, Video
-        }
-
-        public class PostData
-        {
-            public string name { get; set; }
-            public string date { get; set; }
-            public string extension { get; set; }
         }
     }
 }
