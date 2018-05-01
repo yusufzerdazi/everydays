@@ -27,14 +27,9 @@ namespace Yusuf.Zerdazi.Everydays
         private const bool ENABLE_UPDATES = false;
 
         [FunctionName("CreateEveryday")]
-        public static async Task Run(HttpRequestMessage req, TraceWriter log)
+        public static async Task Run([TimerTrigger("0 0 0 * * *")]TimerInfo myTimer, TraceWriter log)
         {
             log.Info("Processing new everyday.");
-
-            // parse query parameter
-            string name = req.GetQueryNameValuePairs().FirstOrDefault(q => string.Compare(q.Key, "name", true) == 0).Value;
-            string date = req.GetQueryNameValuePairs().FirstOrDefault(q => string.Compare(q.Key, "date", true) == 0).Value;
-            string ext = req.GetQueryNameValuePairs().FirstOrDefault(q => string.Compare(q.Key, "ext", true) == 0).Value;
 
             // Get items from folder.
             var videoFolderItemsJson = await GetItems(VideosUrl);
@@ -46,7 +41,7 @@ namespace Yusuf.Zerdazi.Everydays
             folderItems.AddRange(DeserialiseItems(imagesFolderItemsJson));
 
             // Parse corresponding everydays.
-            var folderEverydays = GetFolderEverydays(folderItems, name, date, ext, log);
+            var folderEverydays = GetFolderEverydays(folderItems, log);
             log.Info("Parsed everydays.");
 
             try
@@ -103,7 +98,7 @@ namespace Yusuf.Zerdazi.Everydays
             }
         }
 
-        public static List<Everyday> GetFolderEverydays(List<Item> items, string name, string date, string ext, TraceWriter log)
+        public static List<Everyday> GetFolderEverydays(List<Item> items, TraceWriter log)
         {
             var folderEverydays = new List<Everyday>();
             using (var context = new EverydayContext())
@@ -116,11 +111,7 @@ namespace Yusuf.Zerdazi.Everydays
                         var itemData = item.name.Split(new string[] { "  " }, StringSplitOptions.None);
                         var itemDate = itemData[0];
                         var title = Path.GetFileNameWithoutExtension(itemData[1]);
-                        var extension = Path.GetExtension(itemData[1]).ToLower();
-
-                        if (title != name) continue;
-                        if (itemDate != date) continue;
-                        if (extension != ext) continue;
+                        var extension = Path.GetExtension(itemData[1]);
 
                         // Parse dates.
                         var everydayDate = DateTime.Parse(itemDate).Date;
