@@ -117,10 +117,6 @@ namespace Yusuf.Zerdazi.Everydays
                         var title = Path.GetFileNameWithoutExtension(itemData[1]);
                         var extension = Path.GetExtension(itemData[1]).ToLower();
 
-                        log.Info($"{title}, {data.name}");
-                        log.Info($"{itemDate}, {data.date}");
-                        log.Info($"{extension}, {data.extension}");
-
                         if (title != data.name) continue;
                         if (itemDate != data.date) continue;
                         if (extension != data.extension) continue;
