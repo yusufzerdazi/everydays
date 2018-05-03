@@ -21,9 +21,9 @@ namespace Yusuf.Zerdazi.Everydays
 {
     public static class CreateEveryday
     {
-        private const string VideosUrl = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoZVpLTzNkZXBUWEVKTloyUUE/driveItem/children";
-        private const string AudioURL = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoZEVTY091c25XbG16VVJtZHc/driveItem/children";
-        private const string ImagesURL = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoYzliSXozZlJic3c0ZnhsQWc/driveItem/children";
+        private const string VideosUrl = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoZVpLTzNkZXBUWEVKTloyUUE/driveItem/children?top=1000";
+        private const string AudioURL = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoZEVTY091c25XbG16VVJtZHc/driveItem/children?top=1000";
+        private const string ImagesURL = "https://api.onedrive.com/v1.0/shares/u!aHR0cHM6Ly8xZHJ2Lm1zL2YvcyFBaWdMYzlWX1M5UlVoYzliSXozZlJic3c0ZnhsQWc/driveItem/children?top=1000";
         private const bool ENABLE_UPDATES = false;
 
         [FunctionName("CreateEveryday")]
