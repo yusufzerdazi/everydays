@@ -27,12 +27,12 @@ namespace Everydays
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("EverydaysStorageConnectionString"));
             _containerClient = blobServiceClient.GetBlobContainerClient("everydays");
 
-            await ScrapeInstagram("https://instagram.com/everyda.ys");
+            await ScrapeInstagram("https://instagram.com/everyda.ys", log);
             log.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
         }
 
 
-        public static async Task<object> ScrapeInstagram(string url)
+        public static async Task<object> ScrapeInstagram(string url, ILogger log)
         {
             var existingEverydays = new List<string>();
             await foreach (BlobItem page in _containerClient.GetBlobsAsync(prefix: "data"))
@@ -60,6 +60,7 @@ namespace Everydays
 
                     // serialize objects and fetch the user data
                     dynamic jsonStuff = JObject.Parse(scriptInnerText);
+                    log.LogInformation(jsonStuff);
                     JArray igPosts = jsonStuff["entry_data"]["ProfilePage"][0]["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"];
 
                     var posts = igPosts.Select(ParseInstagramPost).ToList();
