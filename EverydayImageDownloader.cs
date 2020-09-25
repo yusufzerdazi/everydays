@@ -3,7 +3,6 @@ using System.IO;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Everydays;
 using System.Net.Http;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -12,7 +11,7 @@ using SixLabors.ImageSharp.Processing;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
 
-namespace everydaysscraper
+namespace Everydays
 {
     public static class EverydayImageDownloader
     {
@@ -30,6 +29,11 @@ namespace everydaysscraper
             var everyday = JsonConvert.DeserializeObject<InstagramPost>(everydayText);
             var smallImageUrl = $"{everyday.Permalink}/media/?size=t";
             var mediumImageUrl = $"{everyday.Permalink}/media/?size=m";
+
+            if(everyday.Timestamp == "2017-12-18")
+            {
+                return;
+            }
 
             using (var httpClient = new HttpClient())
             {

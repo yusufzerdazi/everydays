@@ -21,7 +21,7 @@ namespace Everydays
         private static BlobContainerClient _containerClient;
 
         [FunctionName("EverydaysScraper")]
-        public static async Task Run([TimerTrigger("0 0 0 */1 * *", RunOnStartup = true)] TimerInfo myTimer, ILogger log)
+        public static async Task Run([TimerTrigger("0 0 0 * * *", RunOnStartup = true)] TimerInfo myTimer, ILogger log)
         {
             // Create a BlobServiceClient object which will be used to create a container client
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("EverydaysStorageConnectionString"));

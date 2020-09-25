@@ -11,9 +11,6 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.1" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="everydays.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="host.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
