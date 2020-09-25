@@ -60,7 +60,7 @@ namespace Everydays
 
                     // serialize objects and fetch the user data
                     dynamic jsonStuff = JObject.Parse(scriptInnerText);
-                    log.LogInformation(jsonStuff);
+                    log.LogInformation(JsonConvert.SerializeObject(jsonStuff));
                     JArray igPosts = jsonStuff["entry_data"]["ProfilePage"][0]["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"];
 
                     var posts = igPosts.Select(ParseInstagramPost).ToList();
