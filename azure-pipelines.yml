@@ -20,5 +20,3 @@ steps:
     appType: 'functionAppLinux'
     appName: 'everydays'
     package: '$(System.DefaultWorkingDirectory)/**/*.zip'
-    runtimeStack: 'DOCKER|microsoft/azure-functions-dotnet-core2.0:2.0'
-    echo See https://aka.ms/yaml
