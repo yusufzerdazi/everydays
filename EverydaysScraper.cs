@@ -27,7 +27,7 @@ namespace Everydays
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("EverydaysStorageConnectionString"));
             _containerClient = blobServiceClient.GetBlobContainerClient("everydays");
 
-            await ScrapeInstagram("http://pi.zerdazi.com/proxy?url=https://instagram.com/everyda.ys&key=wfohunw49p724g0853h0heskl", log);
+            await ScrapeInstagram("https://pi.zerdazi.com/proxy?url=https://instagram.com/everyda.ys&key=wfohunw49p724g0853h0heskl", log);
             log.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
         }
 
