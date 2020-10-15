@@ -18,23 +18,20 @@ namespace Everydays
         private static BlobContainerClient _containerClient;
 
         [FunctionName("EverydayConsolidator")]
-        public static async Task Run([BlobTrigger("everydays/data/{name}", Connection = "EverydaysStorageConnectionString")]Stream myBlob, string name, ILogger log)
+        public static async Task Run([TimerTrigger("0 0 1 * * *")] TimerInfo myTimer, string name, ILogger log)
         {
             // Create a BlobServiceClient object which will be used to create a container client
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("EverydaysStorageConnectionString"));
             _containerClient = blobServiceClient.GetBlobContainerClient("everydays");
 
-            var everydaysClient = _containerClient.GetBlobClient($"everydays.json");
-            var currentEverydays = await everydaysClient.DownloadAsync();
-            var currentEverydaysReader = new StreamReader(currentEverydays.Value.Content);
-            string currentEverydaysText = currentEverydaysReader.ReadToEnd();
-            var everydays = JsonConvert.DeserializeObject<List<InstagramPost>>(currentEverydaysText);
-
-            var newEverydayReader = new StreamReader(myBlob);
-            string newEverydayText = newEverydayReader.ReadToEnd();
-            var newEveryday = JsonConvert.DeserializeObject<InstagramPost>(newEverydayText);
-
-            everydays.Add(newEveryday);
+            var everydays = new List<InstagramPost>();
+            await foreach(var blob in _containerClient.GetBlobsAsync(prefix: "data")){
+                var everydayBlobClient = _containerClient.GetBlobClient(blob.Name);
+                var blobContent = await everydayBlobClient.DownloadAsync();
+                var everydayReader = new StreamReader(blobContent.Value.Content);
+                string everydayText = everydayReader.ReadToEnd();
+                everydays.Add(JsonConvert.DeserializeObject<InstagramPost>(everydayText));
+            }
 
             var everydaysString = JsonConvert.SerializeObject(everydays);
             byte[] byteArray = Encoding.UTF8.GetBytes(everydaysString);
