@@ -52,13 +52,13 @@ namespace Everydays
                     input.Save(stream, format);
 
                     stream.Position = 0;
-                    await _containerClient.DeleteBlobIfExistsAsync($"imagesSmall/{everyday.Timestamp}.jpg");
-                    await _containerClient.UploadBlobAsync($"imagesSmall/{everyday.Timestamp}.jpg", stream);
+                    var smallBlobClient = _containerClient.GetBlobClient($"imagesSmall/{everyday.Timestamp}.jpg");
+                    await smallBlobClient.UploadAsync(stream, overwrite: true);
                 }
 
                 mediumStream.Position = 0;
-                await _containerClient.DeleteBlobIfExistsAsync($"images/{everyday.Timestamp}.jpg");
-                await _containerClient.UploadBlobAsync($"images/{everyday.Timestamp}.jpg", mediumStream);
+                var blobClient = _containerClient.GetBlobClient($"images/{everyday.Timestamp}.jpg");
+                await blobClient.UploadAsync(mediumStream, overwrite: true);
             }
         }
 

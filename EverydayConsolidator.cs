@@ -40,8 +40,8 @@ namespace Everydays
             byte[] byteArray = Encoding.UTF8.GetBytes(everydaysString);
             MemoryStream stream = new MemoryStream(byteArray);
 
-            await _containerClient.DeleteBlobIfExistsAsync($"everydays.json");
-            await _containerClient.UploadBlobAsync($"everydays.json", stream);
+            var blobClient = _containerClient.GetBlobClient($"everydays.json");
+            await blobClient.UploadAsync(stream, overwrite: true);
         }
     }
 }

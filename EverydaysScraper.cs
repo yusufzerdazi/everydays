@@ -13,21 +13,36 @@ using Azure.Storage.Blobs.Models;
 using System.IO;
 using Newtonsoft.Json;
 using System.Text;
+using System.Net;
 
 namespace Everydays
 {
     public static class EverydaysScraper
     {
         private static BlobContainerClient _containerClient;
+        private static HttpClientHandler _httpClientHandler;
 
         [FunctionName("EverydaysScraper")]
         public static async Task Run([TimerTrigger("0 0 0 * * *")] TimerInfo myTimer, ILogger log)
         {
+            // First create a proxy object
+            var proxy = new WebProxy
+            {
+                Address = new Uri($"http://pi.zerdazi.com:8118"),
+                BypassProxyOnLocal = false
+            };
+
+            // Now create a client handler which uses that proxy
+            _httpClientHandler = new HttpClientHandler
+            {
+                Proxy = proxy,
+            };
+
             // Create a BlobServiceClient object which will be used to create a container client
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("EverydaysStorageConnectionString"));
             _containerClient = blobServiceClient.GetBlobContainerClient("everydays");
 
-            await ScrapeInstagram("https://pi.zerdazi.com/proxy?url=https://instagram.com/everyda.ys&key=wfohunw49p724g0853h0heskl", log);
+            await ScrapeInstagram("https://instagram.com/everyda.ys", log);
             log.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
         }
 
@@ -39,7 +54,7 @@ namespace Everydays
             {
                 existingEverydays.Add(Path.GetFileNameWithoutExtension(page.Name));
             }
-            using (var client = new HttpClient())
+            using (var client = new HttpClient(handler: _httpClientHandler, disposeHandler: false))
             {
                 var response = await client.GetAsync(url);
                 if (response.IsSuccessStatusCode)
@@ -71,7 +86,8 @@ namespace Everydays
                         var serialised = JsonConvert.SerializeObject(everyday);
                         byte[] byteArray = Encoding.UTF8.GetBytes(serialised);
                         MemoryStream stream = new MemoryStream(byteArray);
-                        await _containerClient.UploadBlobAsync($"data/{everyday.Timestamp}.json", stream);
+                        var blobClient = _containerClient.GetBlobClient($"data/{everyday.Timestamp}.json");
+                        // await blobClient.UploadAsync(stream, overwrite: true);
                     }
 
                     return newPosts;
