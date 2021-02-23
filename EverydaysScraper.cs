@@ -87,7 +87,7 @@ namespace Everydays
                         byte[] byteArray = Encoding.UTF8.GetBytes(serialised);
                         MemoryStream stream = new MemoryStream(byteArray);
                         var blobClient = _containerClient.GetBlobClient($"data/{everyday.Timestamp}.json");
-                        // await blobClient.UploadAsync(stream, overwrite: true);
+                        await blobClient.UploadAsync(stream, overwrite: true);
                     }
 
                     return newPosts;
