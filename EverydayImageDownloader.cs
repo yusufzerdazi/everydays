@@ -10,6 +10,8 @@ using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Processing;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
+using System.Net;
+using System.Dynamic;
 
 namespace Everydays
 {
@@ -27,44 +29,58 @@ namespace Everydays
             StreamReader reader = new StreamReader(myBlob);
             string everydayText = reader.ReadToEnd();
             var everyday = JsonConvert.DeserializeObject<InstagramPost>(everydayText);
-            var smallImageUrl = $"{everyday.Permalink}/media/?size=t";
-            var mediumImageUrl = $"{everyday.Permalink}/media/?size=m";
+
+            var instagramClientId = Environment.GetEnvironmentVariable("InstagramClientId");
+            var instagramClientSecret = Environment.GetEnvironmentVariable("InstagramClientSecret");
 
             if(everyday.Timestamp == "2017-12-18")
             {
                 return;
             }
 
-            using (var httpClient = new HttpClient())
+            var httpClientHandler = new HttpClientHandler
             {
-                var smallMetadata = await httpClient.GetAsync(smallImageUrl);
-                var smallImage = await httpClient.GetAsync(smallMetadata.RequestMessage.RequestUri);
-                var smallStream = await smallImage.Content.ReadAsStreamAsync();
+                AllowAutoRedirect = true
+            };
 
-                var mediumMetadata = await httpClient.GetAsync(mediumImageUrl);
-                var mediumImage = await httpClient.GetAsync(mediumMetadata.RequestMessage.RequestUri);
-                var mediumStream = await mediumImage.Content.ReadAsStreamAsync();
+            using (var httpClient = new HttpClient(httpClientHandler))
+            {
+                var tokenResponse = await httpClient.GetAsync($"https://graph.facebook.com/oauth/access_token?client_id={instagramClientId}&client_secret={instagramClientSecret}&grant_type=client_credentials");
+                dynamic tokenObject = JsonConvert.DeserializeObject<ExpandoObject>(await tokenResponse.Content.ReadAsStringAsync());
+                
+                var imageResponse = await httpClient.GetAsync($@"https://graph.facebook.com/instagram_oembed?url={WebUtility.UrlEncode(everyday.Permalink)}&access_token={tokenObject.access_token}");
+                dynamic imageObject = JsonConvert.DeserializeObject<ExpandoObject>(await imageResponse.Content.ReadAsStringAsync());
+                var imageUrl = imageObject.thumbnail_url;
 
-                using (Image<Rgba32> input = Image.Load<Rgba32>(smallStream, out IImageFormat format))
+                var image = await httpClient.GetAsync(imageUrl);
+                var stream = await image.Content.ReadAsStreamAsync();
+
+                using (Image<Rgba32> input = Image.Load<Rgba32>(stream, out IImageFormat format))
                 {
-                    ResizeImage(input, (30, 30), format);
-                    MemoryStream stream = new MemoryStream();
-                    input.Save(stream, format);
+                    var smallStream = ResizeImage(input, (30, 30), format);
 
-                    stream.Position = 0;
+                    smallStream.Position = 0;
                     var smallBlobClient = _containerClient.GetBlobClient($"imagesSmall/{everyday.Timestamp}.jpg");
-                    await smallBlobClient.UploadAsync(stream, overwrite: true);
+                    await smallBlobClient.UploadAsync(smallStream, overwrite: true);
                 }
 
-                mediumStream.Position = 0;
+                stream.Position = 0;
                 var blobClient = _containerClient.GetBlobClient($"images/{everyday.Timestamp}.jpg");
-                await blobClient.UploadAsync(mediumStream, overwrite: true);
+                await blobClient.UploadAsync(stream, overwrite: true);
             }
         }
 
-        public static void ResizeImage(Image<Rgba32> input, (int,int) dimensions, IImageFormat format)
+        public static Stream ResizeImage(Image<Rgba32> input, (int,int) dimensions, IImageFormat format)
         {
-            input.Mutate(x => x.Resize(dimensions.Item1, dimensions.Item2));
+            var stream = new MemoryStream();
+            var clonedImage = input.Clone(i => i.Resize(new ResizeOptions
+                {
+                    Mode = ResizeMode.Crop,
+                    Size = new Size(dimensions.Item1, dimensions.Item2)
+                }));
+
+            clonedImage.Save(stream, format);
+            return stream;
         }
     }
 }
